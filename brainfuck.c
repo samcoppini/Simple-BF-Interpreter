@@ -56,15 +56,28 @@ Commands read_file(FILE *file) {
 				break;
 			}
 				
-			case '[': {
-				Node *temp = loop_stack;
-				loop_stack = (Node *) malloc(sizeof(Node));
-				loop_stack->val = commands.num_commands;
-				loop_stack->next = temp;
-				commands.cmds[commands.num_commands].type = CMD_LOOP_BEGIN;
-				commands.num_commands++;
+			case '[':
+				if (commands.num_commands == 0 || commands.cmds[commands.num_commands - 1].type == CMD_LOOP_END ||
+				   (commands.cmds[commands.num_commands - 1].type == CMD_SET && commands.cmds[commands.num_commands - 1].change_val == 0))
+				{
+					int bracket_level = 1, c;
+					while (bracket_level > 0 && !feof(file)) {
+						c = fgetc(file);
+						if (c == ']')
+							bracket_level--;
+						else if (c == '[')
+							bracket_level++;
+					}
+				}
+				else {
+					Node *temp = loop_stack;
+					loop_stack = (Node *) malloc(sizeof(Node));
+					loop_stack->val = commands.num_commands;
+					loop_stack->next = temp;
+					commands.cmds[commands.num_commands].type = CMD_LOOP_BEGIN;
+					commands.num_commands++;
+				}
 				break;
-			}
 				
 			case ']': {
 				int loop_loc = loop_stack->val;
