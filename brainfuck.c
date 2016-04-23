@@ -33,11 +33,22 @@ Commands read_file(FILE *file) {
 	while (!feof(file)) {
 		switch (c = fgetc(file)) {
 			case '+': case '-':
-			case '>': case '<':
-				commands.cmds[commands.num_commands].type = (c == '+' || c == '-') ? CMD_CHANGE: CMD_MOVE;
-				commands.cmds[commands.num_commands].change_val = (c == '+' || c == '>') ? 1 : -1;
-				commands.num_commands++;
+			case '>': case '<': {
+				enum CommandKind type = (c == '+' || c == '-') ? CMD_CHANGE: CMD_MOVE;
+				int change_amt = (c == '+' || c == '>') ? 1 : -1;
+				if (commands.num_commands > 0 && commands.cmds[commands.num_commands - 1].type == type) {
+					commands.cmds[commands.num_commands - 1].change_val += change_amt;
+					if (commands.cmds[commands.num_commands - 1].change_val == 0) {
+						commands.num_commands--;
+					}
+				}
+				else {
+					commands.cmds[commands.num_commands].type = type;
+					commands.cmds[commands.num_commands].change_val = change_amt;
+					commands.num_commands++;
+				}
 				break;
+			}
 				
 			case '[': {
 				Node *temp = loop_stack;
