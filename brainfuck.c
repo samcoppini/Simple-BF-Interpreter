@@ -87,7 +87,10 @@ Commands read_file(FILE *file) {
 					commands.cmds[commands.num_commands - 2].type == CMD_LOOP_BEGIN)
 				{
 					commands.num_commands -= 2;
-					commands.cmds[commands.num_commands].type = CMD_SET;
+					if (commands.cmds[commands.num_commands - 1].type == CMD_SET) 
+						commands.num_commands -= 1;
+					else
+						commands.cmds[commands.num_commands].type = CMD_SET;
 					commands.cmds[commands.num_commands].change_val = 0;
 				}
 				else {
