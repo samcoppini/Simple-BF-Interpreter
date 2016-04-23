@@ -3,6 +3,7 @@
 
 enum CommandKind {
 	CMD_CHANGE,
+	CMD_SET,
 	CMD_MOVE,
 	CMD_LOOP_BEGIN,
 	CMD_LOOP_END,
@@ -36,17 +37,22 @@ Commands read_file(FILE *file) {
 			case '>': case '<': {
 				enum CommandKind type = (c == '+' || c == '-') ? CMD_CHANGE: CMD_MOVE;
 				int change_amt = (c == '+' || c == '>') ? 1 : -1;
-				if (commands.num_commands > 0 && commands.cmds[commands.num_commands - 1].type == type) {
-					commands.cmds[commands.num_commands - 1].change_val += change_amt;
-					if (commands.cmds[commands.num_commands - 1].change_val == 0) {
-						commands.num_commands--;
+				if (commands.num_commands > 0) {
+					if (type == CMD_CHANGE && commands.cmds[commands.num_commands - 1].type == CMD_SET) {
+						commands.cmds[commands.num_commands - 1].change_val += change_amt;
+						break;
+					}
+					else if (commands.num_commands > 0 && commands.cmds[commands.num_commands - 1].type == type) {
+						commands.cmds[commands.num_commands - 1].change_val += change_amt;
+						if (commands.cmds[commands.num_commands - 1].change_val == 0) {
+							commands.num_commands--;
+						}
+						break;
 					}
 				}
-				else {
-					commands.cmds[commands.num_commands].type = type;
-					commands.cmds[commands.num_commands].change_val = change_amt;
-					commands.num_commands++;
-				}
+				commands.cmds[commands.num_commands].type = type;
+				commands.cmds[commands.num_commands].change_val = change_amt;
+				commands.num_commands++;
 				break;
 			}
 				
@@ -63,10 +69,20 @@ Commands read_file(FILE *file) {
 			case ']': {
 				int loop_loc = loop_stack->val;
 				loop_stack = loop_stack->next;
-				commands.cmds[commands.num_commands].type = CMD_LOOP_END;
-				commands.cmds[commands.num_commands].change_val = loop_loc;
-				commands.cmds[loop_loc].change_val = commands.num_commands;
-				commands.num_commands++;
+				if (commands.cmds[commands.num_commands - 1].type == CMD_CHANGE &&
+				    commands.cmds[commands.num_commands - 1].change_val % 2 == 1 &&
+					commands.cmds[commands.num_commands - 2].type == CMD_LOOP_BEGIN)
+				{
+					commands.num_commands -= 2;
+					commands.cmds[commands.num_commands].type = CMD_SET;
+					commands.cmds[commands.num_commands].change_val = 0;
+				}
+				else {
+					commands.cmds[commands.num_commands].type = CMD_LOOP_END;
+					commands.cmds[commands.num_commands].change_val = loop_loc;
+					commands.cmds[loop_loc].change_val = commands.num_commands;
+					commands.num_commands++;
+				}
 				break;
 			}
 				
@@ -99,6 +115,10 @@ void execute(Commands commands, FILE *input) {
 		switch (code[code_pos].type) {
 			case CMD_CHANGE:
 				tape[tape_pos] += code[code_pos].change_val;
+				break;
+				
+			case CMD_SET:
+				tape[tape_pos] = code[code_pos].change_val;
 				break;
 				
 			case CMD_MOVE:
