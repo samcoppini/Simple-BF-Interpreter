@@ -1,5 +1,5 @@
 [
-	99 Bottles of Beer of Wall program
+	99 Bottles of Beer on the Wall program
 	Written by Keymaker
 	Taken from http://www.brain------------------------------------------------------fuck.com/
 ]
