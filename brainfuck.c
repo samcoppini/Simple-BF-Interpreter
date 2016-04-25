@@ -29,6 +29,13 @@ typedef struct Node {
 
 //Adds an end to a loop to a list of commands, optimizing it away if possible
 void add_loop_end(Commands *commands, int loop_start) {
+	//If the previous command is a loop end, we don't need an extra one,
+	//so just make sure to adjust the loop beginning
+	if (commands->cmds[commands->num_commands - 1].type == CMD_LOOP_BEGIN) {
+		commands->cmds[loop_start].change_val = commands->num_commands;
+		return;
+	}
+	
 	//Looks through the contents of a loop, and checks to see if it can
 	//be optimized, and it keeps track of the leftmost and rightmost cells
 	//travelled to relative to the starting position
