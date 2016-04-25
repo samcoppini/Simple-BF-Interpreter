@@ -80,7 +80,7 @@ Commands read_file(FILE *file) {
 				break;
 				
 			case ']': {
-				int loop_loc = loop_stack->val;
+				Node *top = loop_stack;
 				loop_stack = loop_stack->next;
 				if (commands.cmds[commands.num_commands - 1].type == CMD_CHANGE &&
 				    commands.cmds[commands.num_commands - 1].change_val % 2 == 1 &&
@@ -95,10 +95,11 @@ Commands read_file(FILE *file) {
 				}
 				else {
 					commands.cmds[commands.num_commands].type = CMD_LOOP_END;
-					commands.cmds[commands.num_commands].change_val = loop_loc;
-					commands.cmds[loop_loc].change_val = commands.num_commands;
+					commands.cmds[commands.num_commands].change_val = top->val;
+					commands.cmds[top->val].change_val = commands.num_commands;
 					commands.num_commands++;
 				}
+				free(top);
 				break;
 			}
 				
