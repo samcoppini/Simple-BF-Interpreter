@@ -153,13 +153,19 @@ Commands read_file(FILE *file) {
 				}
 				break;
 				
-			case ']': {
-				Node *top = loop_stack;
-				loop_stack = loop_stack->next;
-				add_loop_end(&commands, top->val);
-				free(top);
+			case ']':
+				if (loop_stack == NULL) {
+					printf("Error! Unmatched ] found in code!");
+					free(commands.cmds);
+					exit(0);
+				}
+				else {
+					Node *top = loop_stack;
+					loop_stack = loop_stack->next;
+					add_loop_end(&commands, top->val);
+					free(top);
+				}
 				break;
-			}
 				
 			case '.':
 				commands.cmds[commands.num_commands].type = CMD_OUTPUT;
@@ -175,6 +181,17 @@ Commands read_file(FILE *file) {
 			allocated *= 2;
 			commands.cmds = (Command *) realloc(commands.cmds, allocated * sizeof(Command));
 		}
+	}
+	if (loop_stack != NULL) {
+		while (loop_stack != NULL) {
+			Node *temp = loop_stack;
+			loop_stack = loop_stack->next;
+			free(temp);
+		}
+		printf("Error! Unmatched [ found in the code!");
+		fclose(file);
+		free(commands.cmds);
+		exit(0);
 	}
 	fclose(file);
 	commands.cmds = (Command *) realloc(commands.cmds, commands.num_commands * sizeof(Command));
@@ -244,7 +261,7 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 	
-	Commands code = read_file(code_file);	
+	Commands code = read_file(code_file);
 	FILE *input_file = argc > 2 ? fopen(argv[2], "r"): NULL;
 	execute(code, input_file);
 	
