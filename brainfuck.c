@@ -33,7 +33,7 @@ void add_loop_end(Commands *commands, int loop_start) {
 	//be optimized, and it keeps track of the leftmost and rightmost cells
 	//travelled to relative to the starting position
 	int cur_cmd, max_lcell = 0, max_rcell = 0, cur_cell = 0;
-	for (cur_cmd = loop_start; cur_cmd != commands->num_commands; cur_cmd++) {
+	for (cur_cmd = loop_start + 1; cur_cmd != commands->num_commands; cur_cmd++) {
 		if (commands->cmds[cur_cmd].type == CMD_MOVE) {
 			cur_cell += commands->cmds[cur_cmd].change_val;
 			if (cur_cell > max_rcell)
