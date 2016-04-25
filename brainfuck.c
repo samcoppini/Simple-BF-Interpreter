@@ -3,6 +3,7 @@
 
 enum CommandKind {
 	CMD_CHANGE,
+	CMD_ADD_PRODUCT,
 	CMD_SET,
 	CMD_MOVE,
 	CMD_LOOP_BEGIN,
@@ -13,7 +14,7 @@ enum CommandKind {
 
 typedef struct Command {
 	enum CommandKind type;
-	int change_val;
+	int change_val, offset;
 } Command;
 
 typedef struct Commands {
@@ -25,6 +26,72 @@ typedef struct Node {
 	int val;
 	struct Node *next;
 } Node;
+
+//Adds an end to a loop to a list of commands, optimizing it away if possible
+void add_loop_end(Commands *commands, int loop_start) {
+	//Looks through the contents of a loop, and checks to see if it can
+	//be optimized, and it keeps track of the leftmost and rightmost cells
+	//travelled to relative to the starting position
+	int cur_cmd, max_lcell = 0, max_rcell = 0, cur_cell = 0;
+	for (cur_cmd = loop_start; cur_cmd != commands->num_commands; cur_cmd++) {
+		if (commands->cmds[cur_cmd].type == CMD_MOVE) {
+			cur_cell += commands->cmds[cur_cmd].change_val;
+			if (cur_cell > max_rcell)
+				max_rcell = cur_cell;
+			else if (cur_cell < max_lcell)
+				max_lcell = cur_cell;
+		}
+		else if (commands->cmds[cur_cmd].type != CMD_CHANGE)
+		//If a loop has commands other than +->< it can't be turned into
+		//a series of multiplications, so break out of it
+			break;
+	}
+	
+	//If all the commands in the loop were +->< and we end on the same cell we
+	//entered the loop on, we are able to change it to a series of multiplications,
+	//so we do that
+	if (cur_cmd == commands->num_commands && cur_cell == 0) {
+		int num_cells = max_rcell - max_lcell + 1;
+		int cell_changes[num_cells];
+		for (cur_cell = 0; cur_cell < num_cells; cur_cell++) {
+			cell_changes[cur_cell] = 0;
+		}
+		cur_cell = -max_lcell;
+		for (cur_cmd = loop_start; cur_cmd != commands->num_commands; cur_cmd++) {
+			if (commands->cmds[cur_cmd].type == CMD_CHANGE) {
+				cell_changes[cur_cell] += commands->cmds[cur_cmd].change_val;
+			}
+			else if (commands->cmds[cur_cmd].type == CMD_MOVE) {
+				cur_cell += commands->cmds[cur_cmd].change_val;
+			}
+		}
+		//We can't transform the loop to a series of multiplications unless the
+		//change to the starting cell is exactly -
+		if (cell_changes[-max_lcell] == -1) {
+			commands->num_commands = loop_start;
+			for (cur_cell = 0; cur_cell < num_cells; cur_cell++) {
+				//If the cell changes in the loop, add a multiplication for it
+				if (cell_changes[cur_cell] != 0 && cur_cell != -max_lcell) {
+					commands->cmds[commands->num_commands].type = CMD_ADD_PRODUCT;
+					commands->cmds[commands->num_commands].change_val = cell_changes[cur_cell];
+					commands->cmds[commands->num_commands].offset = cur_cell + max_lcell;
+					commands->num_commands++;
+				}
+			}
+			//After we've added the multiplications, set the starting cell to 0
+			commands->cmds[commands->num_commands].type = CMD_SET;
+			commands->cmds[commands->num_commands].change_val = 0;
+			commands->num_commands++;
+			return;
+		}
+	}
+	
+	//If we couldn't optimize the loop, just add a loop end command normally
+	commands->cmds[commands->num_commands].type = CMD_LOOP_END;
+	commands->cmds[commands->num_commands].change_val = loop_start;
+	commands->cmds[loop_start].change_val = commands->num_commands;
+	commands->num_commands++;
+}
 
 //Reads a file and returns the commands in the file
 Commands read_file(FILE *file) {
@@ -82,23 +149,7 @@ Commands read_file(FILE *file) {
 			case ']': {
 				Node *top = loop_stack;
 				loop_stack = loop_stack->next;
-				if (commands.cmds[commands.num_commands - 1].type == CMD_CHANGE &&
-				    commands.cmds[commands.num_commands - 1].change_val % 2 == 1 &&
-					commands.cmds[commands.num_commands - 2].type == CMD_LOOP_BEGIN)
-				{
-					commands.num_commands -= 2;
-					if (commands.cmds[commands.num_commands - 1].type == CMD_SET) 
-						commands.num_commands -= 1;
-					else
-						commands.cmds[commands.num_commands].type = CMD_SET;
-					commands.cmds[commands.num_commands].change_val = 0;
-				}
-				else {
-					commands.cmds[commands.num_commands].type = CMD_LOOP_END;
-					commands.cmds[commands.num_commands].change_val = top->val;
-					commands.cmds[top->val].change_val = commands.num_commands;
-					commands.num_commands++;
-				}
+				add_loop_end(&commands, top->val);
 				free(top);
 				break;
 			}
@@ -132,6 +183,10 @@ void execute(Commands commands, FILE *input) {
 		switch (code[code_pos].type) {
 			case CMD_CHANGE:
 				tape[tape_pos] += code[code_pos].change_val;
+				break;
+				
+			case CMD_ADD_PRODUCT:
+				tape[tape_pos + code[code_pos].offset] += tape[tape_pos] * code[code_pos].change_val;
 				break;
 				
 			case CMD_SET:
