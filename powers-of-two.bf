@@ -10,17 +10,18 @@ Sets up the tape and enters the main loop
 Go through the tape and output each digit as its ascii equivalent
 [<<++++++[>++++++++<-]>.<++++++[>--------<-]<]
 
-Print a newline and moves to the first digit
+Print a newline and moves to the last digit
 ++++++++++.[-]>>>
 
 Moves a doubled copy of the digit into a temp cell
 [<[<++>-]
 
-Checks to see if the doubled digit is greater than ten
+Checks to see if the doubled digit is greater than nine
 <[>+<-[>+<-[>+<-[>+<-[>+<-[>+<-[>+<-[>+<-[>+<-
 
-If the digit is greater than ten carry the one to the next cell
+If the digit is greater than nine carry the one to the next cell 
+and move the remainder into the current digit
 [>[-]<[>+<-]>->>+>>[-]+<<<<<
 
-Move the next digit
+Move to the next digit
 ]]]]]]]]]]>>>>>]<<<]
