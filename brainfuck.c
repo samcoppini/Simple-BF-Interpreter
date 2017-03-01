@@ -31,11 +31,11 @@ typedef struct Node {
 void add_loop_end(Commands *commands, int loop_start) {
 	//If the previous command is a loop end, we don't need an extra one,
 	//so just make sure to adjust the loop beginning
-	if (commands->cmds[commands->num_commands - 1].type == CMD_LOOP_BEGIN) {
+	if (commands->cmds[commands->num_commands - 1].type == CMD_LOOP_END) {
 		commands->cmds[loop_start].change_val = commands->num_commands;
 		return;
 	}
-	
+
 	//Looks through the contents of a loop, and checks to see if it can
 	//be optimized, and it keeps track of the leftmost and rightmost cells
 	//travelled to relative to the starting position
@@ -53,7 +53,7 @@ void add_loop_end(Commands *commands, int loop_start) {
 		//a series of multiplications, so break out of it
 			break;
 	}
-	
+
 	//If all the commands in the loop were +->< and we end on the same cell we
 	//entered the loop on, we are able to change it to a series of multiplications,
 	//so we do that
@@ -73,7 +73,7 @@ void add_loop_end(Commands *commands, int loop_start) {
 			}
 		}
 		//We can't transform the loop to a series of multiplications unless the
-		//change to the starting cell is exactly -
+		//change to the starting cell is exactly -1
 		if (cell_changes[-max_lcell] == -1) {
 			commands->num_commands = loop_start;
 			for (cur_cell = 0; cur_cell < num_cells; cur_cell++) {
@@ -92,7 +92,7 @@ void add_loop_end(Commands *commands, int loop_start) {
 			return;
 		}
 	}
-	
+
 	//If we couldn't optimize the loop, just add a loop end command normally
 	commands->cmds[commands->num_commands].type = CMD_LOOP_END;
 	commands->cmds[commands->num_commands].change_val = loop_start;
@@ -129,7 +129,7 @@ Commands read_file(FILE *file) {
 				commands.num_commands++;
 				break;
 			}
-				
+
 			case '[':
 				if (commands.num_commands == 0 || commands.cmds[commands.num_commands - 1].type == CMD_LOOP_END ||
 				   (commands.cmds[commands.num_commands - 1].type == CMD_SET && commands.cmds[commands.num_commands - 1].change_val == 0))
@@ -152,7 +152,7 @@ Commands read_file(FILE *file) {
 					commands.num_commands++;
 				}
 				break;
-				
+
 			case ']':
 				if (loop_stack == NULL) {
 					printf("Error! Unmatched ] found in code!");
@@ -166,12 +166,12 @@ Commands read_file(FILE *file) {
 					free(top);
 				}
 				break;
-				
+
 			case '.':
 				commands.cmds[commands.num_commands].type = CMD_OUTPUT;
 				commands.num_commands++;
 				break;
-				
+
 			case ',':
 				commands.cmds[commands.num_commands].type = CMD_INPUT;
 				commands.num_commands++;
@@ -208,35 +208,35 @@ void execute(Commands commands, FILE *input) {
 			case CMD_CHANGE:
 				tape[tape_pos] += code[code_pos].change_val;
 				break;
-				
+
 			case CMD_ADD_PRODUCT:
 				tape[tape_pos + code[code_pos].offset] += tape[tape_pos] * code[code_pos].change_val;
 				break;
-				
+
 			case CMD_SET:
 				tape[tape_pos] = code[code_pos].change_val;
 				break;
-				
+
 			case CMD_MOVE:
 				tape_pos += code[code_pos].change_val;
 				break;
-				
+
 			case CMD_LOOP_BEGIN:
 				if (!tape[tape_pos]) {
 					code_pos = code[code_pos].change_val;
 				}
 				break;
-				
+
 			case CMD_LOOP_END:
 				if (tape[tape_pos]) {
 					code_pos = code[code_pos].change_val;
 				}
 				break;
-				
+
 			case CMD_OUTPUT:
 				putchar(tape[tape_pos]);
 				break;
-				
+
 			case CMD_INPUT:
 				if (!input) {
 					printf("Error, was unable to read input file\n");
@@ -254,17 +254,17 @@ int main(int argc, char *argv[]) {
 		printf("Error, no brainfuck program given.\n");
 		return 0;
 	}
-	
+
 	FILE *code_file = fopen(argv[1], "r");
 	if (!code_file) {
 		printf("Error, unable to read the brainfuck program.\n");
 		return 0;
 	}
-	
+
 	Commands code = read_file(code_file);
 	FILE *input_file = argc > 2 ? fopen(argv[2], "r"): NULL;
 	execute(code, input_file);
-	
+
 	//Clean up everything
 	free(code.cmds);
 	if (input_file)
