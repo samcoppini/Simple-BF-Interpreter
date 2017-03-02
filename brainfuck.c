@@ -208,7 +208,7 @@ CommandList *read_file(FILE *file) {
              list->cmds[list->num_cmds - 1].change_val == 0))
         {
           int loop_level = 1;
-          while ((c = fgetc(file)) != EOF && loop_level > 0) {
+          while (loop_level > 0 && (c = fgetc(file)) != EOF) {
             if (c == '[')
               loop_level++;
             else if (c == ']')
