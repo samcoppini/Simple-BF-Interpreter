@@ -1,6 +1,7 @@
 #include <stdbool.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 typedef enum CommandType {
   CMD_CHANGE,
@@ -310,22 +311,48 @@ void execute(CommandList *list, FILE *input_file) {
 }
 
 int main(int argc, char *argv[]) {
-  if (argc < 2) {
-    fprintf(stderr, "Error! No BF file given!\n");
+  int i;
+  char *bf_filename = NULL, *input_filename = NULL;
+
+  for (i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "--input") == 0 || strcmp(argv[i], "-i") == 0) {
+      if (++i >= argc) {
+        fprintf(stderr, "Error! %s option requires an argument\n", argv[i -1]);
+        return 1;
+      }
+      else {
+        input_filename = argv[i];
+      }
+    }
+    else {
+      if (bf_filename == NULL) {
+        bf_filename = argv[i];
+      }
+      else {
+        fprintf(stderr, "Error! Can only read one BF file at a time!");
+        return 1;
+      }
+    }
+  }
+
+  if (bf_filename == NULL) {
+    fprintf(stderr, "Error! No BF file provided!\n");
     return 1;
   }
 
-  FILE *bf_file = fopen(argv[1], "r");
+  FILE *bf_file = fopen(bf_filename, "r");
   if (!bf_file) {
-    fprintf(stderr, "Unable to open '%s'.", argv[1]);
+    fprintf(stderr, "Unable to open '%s'.", bf_filename);
     return 1;
   }
 
   FILE *input_file = NULL;
-  if (argc > 2) {
-    input_file = fopen(argv[2], "r");
+  if (input_filename == NULL)
+    input_file = stdin;
+  else {
+    input_file = fopen(input_filename, "r");
     if (!input_file) {
-      fprintf(stderr, "Error! Unable to open '%s'.\n", argv[2]);
+      fprintf(stderr, "Error! Unable to open '%s'.\n", input_filename);
       return 1;
     }
   }
