@@ -38,6 +38,20 @@ typedef struct Stack {
 
 #define INITIAL_STACK_SIZE 16
 
+/* A struct for keeping track of a change to a tape */
+typedef struct TapeChange {
+  int offset, change;
+} TapeChange;
+
+/* A struct for keeping track of all the changes to the tape since the
+   last [ ] . , command */
+typedef struct Changelist {
+  TapeChange *changes;
+  int num_changes, num_allocated;
+} Changelist;
+
+#define INITIAL_CHANGES 8
+
 /* Returns a pointer to a newly-allocated stack */
 Stack *new_stack() {
   Stack *stack = malloc(sizeof(Stack));
@@ -100,6 +114,62 @@ void add_command(CommandList *list, CommandType type, int offset, int val) {
   list->num_cmds++;
 }
 
+/* Returns a pointer to a new list of changes */
+Changelist *new_changelist() {
+  Changelist *cl = malloc(sizeof(Changelist));
+  cl->changes = malloc(INITIAL_CHANGES * sizeof(TapeChange));
+  cl->num_allocated = INITIAL_CHANGES;
+  cl->num_changes = 0;
+  return cl;
+}
+
+/* Adds a change to a list of changes. If a change already exists at a given
+   offset, it adds to that, otherwise it adds a new change */
+void add_change(Changelist *cl, int offset, int change) {
+  int i;
+
+  for (i = 0; i < cl->num_changes; i++) {
+    if (cl->changes[i].offset == offset) {
+      cl->changes[i].change += change;
+      return;
+    }
+  }
+
+  if (cl->num_allocated == cl->num_changes) {
+    cl->num_allocated <<= 1;
+    cl->changes = realloc(cl->changes, cl->num_allocated * sizeof(TapeChange));
+  }
+
+  cl->changes[cl->num_changes].offset = offset;
+  cl->changes[cl->num_changes].change = change;
+  cl->num_changes++;
+}
+
+/* Frees a list of changes */
+void free_changes(Changelist *cl) {
+  free(cl->changes);
+  free(cl);
+}
+
+/* Adds the list of changes to a list of commands */
+void push_changes_to_commands(CommandList *list, Changelist *cl, int pos) {
+  int i;
+
+  /* Goes through every change, adding it to the commands if it is nonzero */
+  for (i = 0; i < cl->num_changes; i++) {
+    if (cl->changes[i].change != 0) {
+      add_command(list, CMD_CHANGE, cl->changes[i].offset,
+                                    cl->changes[i].change);
+    }
+  }
+
+  /* Move the tape pointer to the appropriate place after the changes have
+     been made */
+  if (pos != 0)
+    add_command(list, CMD_MOVE, 0, pos);
+  cl->num_changes = 0;
+}
+
 /* Adds an end to a loop, optimizing it away if possible */
 void add_loop_end(CommandList *list, int loop_start) {
   /* If the previous command is a loop end, we don't need an extra one,
@@ -111,60 +181,38 @@ void add_loop_end(CommandList *list, int loop_start) {
 		return;
 	}
 
-  /* Look through the contents of a loop, and check to see if they can be
-     optimized away to a series of multiplications. Keeps track of how far
-     we move relative to the starting position */
-  int cur_cmd, max_lcell = 0, max_rcell = 0, cur_cell = 0;
+  bool can_opt = true;
+  int cur_cmd, start_cell_change = 0;
+  /* Look through the commands in a loop to see if it can be optimized into a
+     series of multiplications. This can only occur when the loop is made
+     only of CMD_CHANGEs, and the change to the current cell is exactly -1 */
   for (cur_cmd = loop_start + 1; cur_cmd < list->num_cmds; cur_cmd++) {
-    if (list->cmds[cur_cmd].type == CMD_MOVE) {
-      cur_cell += list->cmds[cur_cmd].change_val;
-      if (cur_cell > max_rcell)
-        max_rcell = cur_cell;
-      else if (cur_cell < max_lcell)
-        max_lcell = cur_cell;
+    if (list->cmds[cur_cmd].type == CMD_CHANGE) {
+      if (list->cmds[cur_cmd].offset == 0)
+        start_cell_change = list->cmds[cur_cmd].change_val;
     }
-    /* If a loop contains commands other than + - > <, it can't be optimized
-       away, so we stop looking */
-    else if (list->cmds[cur_cmd].type != CMD_CHANGE)
+    else {
+      can_opt = false;
       break;
+    }
   }
-
-  /* If we didn't encounter any commands other than + - > <, and we ended the
-     loop on the same cell we started on, we can (probably) optimize the loop,
-     so go through the loop to see what changes are made to each cell */
-  if (cur_cmd == list->num_cmds && cur_cell == 0) {
-    int num_cells = max_rcell - max_lcell + 1;
-    int cell_changes[num_cells];
-    for (cur_cell = 0; cur_cell < num_cells; cur_cell++) {
-      cell_changes[cur_cell] = 0;
-    }
-    cur_cell = -max_lcell;
-    for (cur_cmd = loop_start; cur_cmd < list->num_cmds; cur_cmd++) {
-      if (list->cmds[cur_cmd].type == CMD_CHANGE) {
-        cell_changes[cur_cell] += list->cmds[cur_cmd].change_val;
+  if (can_opt && start_cell_change == -1) {
+    int copy_offset = 1;
+    /* Go through the loop, converting CMD_CHANGE to CMD_ADD_PRODUCT, and
+       removing the change to the initial cell */
+    for (cur_cmd = loop_start; cur_cmd + copy_offset < list->num_cmds; cur_cmd++) {
+      if (list->cmds[cur_cmd + copy_offset].offset == 0) {
+        copy_offset++;
+        cur_cmd--;
+        continue;
       }
-      else if (list->cmds[cur_cmd].type == CMD_MOVE) {
-        cur_cell += list->cmds[cur_cmd].change_val;
-      }
+      list->cmds[cur_cmd] = list->cmds[cur_cmd + copy_offset];
+      list->cmds[cur_cmd].type = CMD_ADD_PRODUCT;
     }
-
-    /* If the change to starting cell is exactly -1, we can get rid of the loop
-       and transform it to a series of multiplications */
-    if (cell_changes[-max_lcell] == -1) {
-      list->num_cmds = loop_start;
-      /* Go through the list of cells we visit in the loop. If they are changed
-         in the loop, we have to add a multiplication for it */
-      for (cur_cell = 0; cur_cell < num_cells; cur_cell++) {
-        if (cell_changes[cur_cell] != 0 && cur_cell != -max_lcell) {
-          add_command(list, CMD_ADD_PRODUCT, cur_cell + max_lcell,
-                      cell_changes[cur_cell]);
-        }
-      }
-
-      /* At the end of the loop, we must set the starting cell to 0 */
-      add_command(list, CMD_SET, 0, 0);
-      return;
-    }
+    list->num_cmds -= copy_offset;
+    /* Set the initial cell to 0 after the loop */
+    add_command(list, CMD_SET, 0, 0);
+    return;
   }
 
   /* If we were unable to optimize the loop, add the loop end normally, and
@@ -177,34 +225,29 @@ void add_loop_end(CommandList *list, int loop_start) {
 CommandList *read_file(FILE *file) {
   CommandList *list = new_command_list();
   Stack *loop_stack = new_stack();
-  int c;
+  Changelist *changes = new_changelist();
+  int c, cur_pos = 0;
   while ((c = fgetc(file)) != EOF) {
     switch (c) {
-      case '-': case '+': case '<': case '>': {
-        CommandType type = (c == '+' || c == '-') ? CMD_CHANGE: CMD_MOVE;
-        int change_amt = (c == '>' || c == '+') ? 1: -1;
-        if (list->num_cmds > 0) {
-          Command *last_command = &list->cmds[list->num_cmds - 1];
-          /* Combine like commands with each other, getting rid of them if
-             they cancel each other out */
-          if (last_command->type == type) {
-            last_command->change_val += change_amt;
-            if (last_command->change_val == 0)
-              list->num_cmds--;
-            break;
-          }
-          /* If we encounter a + - command after a set, we can combine them */
-          else if (type == CMD_CHANGE && last_command->type == CMD_SET) {
-            last_command->change_val += change_amt;
-            break;
-          }
-        }
-        /* If we couldn't combine this command with another, add it normally */
-        add_command(list, type, 0, change_amt);
-      }
-      break;
+      case '-':
+        add_change(changes, cur_pos, -1);
+        break;
+
+      case '+':
+        add_change(changes, cur_pos, 1);
+        break;
+
+      case '<':
+        cur_pos--;
+        break;
+
+      case '>':
+        cur_pos++;
+        break;
 
       case '[':
+        push_changes_to_commands(list, changes, cur_pos);
+        cur_pos = 0;
         /* If we know that this loop can never be entered (if it's before any
            other command, or it immediately follows another loop), we remove
            the contents of the loop entirely */
@@ -240,15 +283,21 @@ CommandList *read_file(FILE *file) {
           exit(1);
         }
         else {
+          push_changes_to_commands(list, changes, cur_pos);
+          cur_pos = 0;
           add_loop_end(list, stack_pop(loop_stack));
         }
         break;
 
       case '.':
+        push_changes_to_commands(list, changes, cur_pos);
+        cur_pos = 0;
         add_command(list, CMD_OUTPUT, 0, 0);
         break;
 
       case ',':
+        push_changes_to_commands(list, changes, cur_pos);
+        cur_pos = 0;
         add_command(list, CMD_INPUT, 0, 0);
         break;
     }
@@ -259,6 +308,7 @@ CommandList *read_file(FILE *file) {
   }
   fclose(file);
   free_stack(loop_stack);
+  free_changes(changes);
   return list;
 }
 
@@ -270,7 +320,7 @@ void execute(CommandList *list, FILE *input_file) {
   for (tape_pos = 0, code_pos = 0; code_pos < list->num_cmds; code_pos++) {
     switch (code[code_pos].type) {
       case CMD_CHANGE:
-        tape[tape_pos] += code[code_pos].change_val;
+        tape[tape_pos + code[code_pos].offset] += code[code_pos].change_val;
         break;
 
       case CMD_ADD_PRODUCT: {
@@ -333,7 +383,8 @@ void compile(CommandList *list) {
     }
     switch (list->cmds[i].type) {
       case CMD_CHANGE:
-        printf("*tp += %d;", list->cmds[i].change_val);
+        printf("tp[%d] += %d;", list->cmds[i].offset,
+                                list->cmds[i].change_val);
         break;
 
       case CMD_ADD_PRODUCT:
