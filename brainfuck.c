@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Whether we should condense loop endings into a single command */
+static bool collapse_loop_ends = true;
+
 typedef enum CommandType {
   CMD_CHANGE,
   CMD_ADD_PRODUCT,
@@ -101,7 +104,8 @@ void add_command(CommandList *list, CommandType type, int offset, int val) {
 void add_loop_end(CommandList *list, int loop_start) {
   /* If the previous command is a loop end, we don't need an extra one,
      so we just make sure to adjust the loop's beginning */
-	if (list->cmds[list->num_cmds - 1].type == CMD_LOOP_END) {
+	if (list->cmds[list->num_cmds - 1].type == CMD_LOOP_END && collapse_loop_ends)
+  {
 		list->cmds[loop_start].change_val = list->num_cmds - 1;
 		return;
 	}
@@ -310,9 +314,64 @@ void execute(CommandList *list, FILE *input_file) {
   }
 }
 
+/* Outputs the equivalent C source code for the brainfuck program */
+void compile(CommandList *list) {
+  int i, j, tab;
+
+  printf("#include <stdio.h>\n\n"
+         "int main(int argc, char *argv[]) {\n"
+         "   char tape[30000] = {0};\n"
+         "   char *tp = tape;");
+
+  for (i = 0, tab = 1; i < list->num_cmds; i++) {
+    putchar('\n');
+    if (list->cmds[i].type == CMD_LOOP_END)
+      tab--;
+    for (j = 0; j < tab * 3; j++) {
+      putchar(' ');
+    }
+    switch (list->cmds[i].type) {
+      case CMD_CHANGE:
+        printf("*tp += %d;", list->cmds[i].change_val);
+        break;
+
+      case CMD_ADD_PRODUCT:
+        printf("tp[%d] += *tp * %d;", list->cmds[i].offset,
+                                      list->cmds[i].change_val);
+        break;
+
+      case CMD_SET:
+        printf("*tp = %d;", list->cmds[i].change_val);
+        break;
+
+      case CMD_MOVE:
+        printf("tp += %d;", list->cmds[i].change_val);
+        break;
+
+      case CMD_LOOP_BEGIN:
+        printf("while (*tp) {");
+        tab++;
+        break;
+
+      case CMD_LOOP_END:
+        printf("}");
+        break;
+
+      case CMD_OUTPUT:
+        printf("putchar(*tp);");
+        break;
+
+      default:
+        break;
+    }
+  }
+  printf("\n}");
+}
+
 int main(int argc, char *argv[]) {
-  int i;
   char *bf_filename = NULL, *input_filename = NULL;
+  bool compile_bf = false;
+  int i;
 
   for (i = 1; i < argc; i++) {
     if (strcmp(argv[i], "--input") == 0 || strcmp(argv[i], "-i") == 0) {
@@ -323,6 +382,12 @@ int main(int argc, char *argv[]) {
       else {
         input_filename = argv[i];
       }
+    }
+    else if (strcmp(argv[i], "-c") == 0 || strcmp(argv[i], "--compile") == 0) {
+      compile_bf = true;
+      /* Loop ends aren't collapsed when compiling to C, because it would be
+         more difficult to translate and would provide no benefit anyway */
+      collapse_loop_ends = false;
     }
     else {
       if (bf_filename == NULL) {
@@ -358,6 +423,9 @@ int main(int argc, char *argv[]) {
   }
 
   CommandList *commands = read_file(bf_file);
-  execute(commands, input_file);
+  if (compile_bf)
+    compile(commands);
+  else
+    execute(commands, input_file);
   return 0;
 }
