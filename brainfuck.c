@@ -104,7 +104,8 @@ void add_command(CommandList *list, CommandType type, int offset, int val) {
 void add_loop_end(CommandList *list, int loop_start) {
   /* If the previous command is a loop end, we don't need an extra one,
      so we just make sure to adjust the loop's beginning */
-	if (list->cmds[list->num_cmds - 1].type == CMD_LOOP_END && collapse_loop_ends)
+  if (list->cmds[list->num_cmds - 1].type == CMD_LOOP_END
+      && collapse_loop_ends)
   {
 		list->cmds[loop_start].change_val = list->num_cmds - 1;
 		return;
