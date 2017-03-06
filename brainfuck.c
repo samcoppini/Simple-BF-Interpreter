@@ -372,7 +372,10 @@ void compile(CommandList *list) {
   printf("#include <stdio.h>\n\n"
          "int main(int argc, char *argv[]) {\n"
          "   char tape[30000] = {0};\n"
-         "   char *tp = tape;");
+         "   char *tp = tape;\n"
+         "   FILE *fp = (argc > 1) ? fopen(argv[1], \"r\"): stdin;\n"
+         "   if (!fp) { fprintf(stderr, \"Error opening input!\"); return 1; }"
+         "\n   int c;");
 
   for (i = 0, tab = 1; i < list->num_cmds; i++) {
     putchar('\n');
@@ -413,7 +416,8 @@ void compile(CommandList *list) {
         printf("putchar(*tp);");
         break;
 
-      default:
+      case CMD_INPUT:
+        printf("*tp = ((c = fgetc(fp)) == EOF) ? 0: c;");
         break;
     }
   }
