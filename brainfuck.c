@@ -303,7 +303,7 @@ CommandList *read_file(FILE *file) {
     }
   }
   if (!stack_empty(loop_stack)) {
-    fprintf(stderr, "Error! Unmatched ']' found in the code.\n");
+    fprintf(stderr, "Error! Unmatched '[' found in the code.\n");
     exit(1);
   }
   fclose(file);
