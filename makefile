@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS= -Wall -Wextra
+CFLAGS=$(FLAGS) -Wall -Wextra -Werror -O3 -std=c99 -pedantic
 
 all:
 	$(CC) brainfuck.c $(CFLAGS) -o "bf.exe"
