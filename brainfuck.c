@@ -265,6 +265,7 @@ CommandList *read_file(FILE *file) {
           }
           if (loop_level > 0) {
             fprintf(stderr, "Error! Unmatched '[' found in the code!\n");
+            free_commands(list);
             exit(1);
           }
         }
@@ -280,6 +281,7 @@ CommandList *read_file(FILE *file) {
       case ']':
         if (stack_empty(loop_stack)) {
           fprintf(stderr, "Error! Unmatched ']' found in the code.\n");
+          free_commands(list);
           exit(1);
         }
         else {
@@ -304,6 +306,7 @@ CommandList *read_file(FILE *file) {
   }
   if (!stack_empty(loop_stack)) {
     fprintf(stderr, "Error! Unmatched '[' found in the code.\n");
+    free_commands(list);
     exit(1);
   }
   fclose(file);
@@ -483,5 +486,8 @@ int main(int argc, char *argv[]) {
     compile(commands);
   else
     execute(commands, input_file);
+
+  free_commands(commands);
+
   return 0;
 }
