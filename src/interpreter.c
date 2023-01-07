@@ -55,6 +55,10 @@ bool interpret_bf_bytecode(const uint8_t *bytecode) {
                 }
                 break;
 
+            case BF_MOVE:
+                tape_index += (int8_t) *code_ptr++;
+                break;
+
             case BF_OUTPUT:
                 putchar(tape[tape_index]);
                 break;

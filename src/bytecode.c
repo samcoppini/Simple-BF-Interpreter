@@ -89,43 +89,73 @@ void handle_diff(struct Bytecode *bytecode, uint8_t *cur_diff) {
     *cur_diff = 0;
 }
 
+void handle_move(struct Bytecode *bytecode, int8_t *cur_move) {
+    if (*cur_move == 1) {
+        bytecode_add(bytecode, BF_RIGHT);
+    }
+    else if (*cur_move == -1) {
+        bytecode_add(bytecode, BF_LEFT);
+    }
+    else if (*cur_move != 0) {
+        bytecode_add(bytecode, BF_MOVE);
+        bytecode_add(bytecode, *cur_move);
+    }
+    *cur_move = 0;
+}
+
+void change_move(struct Bytecode *bytecode, int8_t *cur_move, int8_t new_move) {
+    if (new_move == 1 && *cur_move == 127) {
+        handle_move(bytecode, cur_move);
+    }
+    else if (new_move == -1 && *cur_move == -128) {
+        handle_move(bytecode, cur_move);
+    }
+    *cur_move += new_move;
+}
+
 uint8_t *get_bf_bytecode(FILE *file) {
     struct Bytecode bytecode = create_bytecode();
     struct AddressStack stack = create_address_stack();
     uint8_t cur_diff = 0;
+    int8_t cur_move = 0;
     int c;
 
     while ((c = fgetc(file)) != EOF) {
         switch (c) {
             case '+':
+                handle_move(&bytecode, &cur_move);
                 cur_diff++;
                 break;
 
             case '-':
+                handle_move(&bytecode, &cur_move);
                 cur_diff--;
                 break;
 
             case '<':
                 handle_diff(&bytecode, &cur_diff);
-                bytecode_add(&bytecode, BF_LEFT);
+                change_move(&bytecode, &cur_move, -1);
                 break;
 
             case '>':
                 handle_diff(&bytecode, &cur_diff);
-                bytecode_add(&bytecode, BF_RIGHT);
+                change_move(&bytecode, &cur_move, 1);
                 break;
 
             case '.':
+                handle_move(&bytecode, &cur_move);
                 handle_diff(&bytecode, &cur_diff);
                 bytecode_add(&bytecode, BF_OUTPUT);
                 break;
 
             case ',':
+                handle_move(&bytecode, &cur_move);
                 bytecode_add(&bytecode, BF_INPUT);
                 cur_diff = 0;
                 break;
 
             case '[':
+                handle_move(&bytecode, &cur_move);
                 handle_diff(&bytecode, &cur_diff);
                 bytecode_add(&bytecode, BF_LOOP_START);
                 add_placeholder_address(&bytecode);
@@ -137,6 +167,7 @@ uint8_t *get_bf_bytecode(FILE *file) {
                     fprintf(stderr, "Unmatched ]\n");
                     goto err;
                 }
+                handle_move(&bytecode, &cur_move);
                 handle_diff(&bytecode, &cur_diff);
                 bytecode_add(&bytecode, BF_LOOP_END);
                 add_placeholder_address(&bytecode);
