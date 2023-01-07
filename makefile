@@ -1,5 +1,5 @@
 CC?=gcc
-CFLAGS=$(FLAGS) -Wall -Wextra -Werror -std=c99 -pedantic -Iinc -g
+CFLAGS=$(FLAGS) -Wall -Wextra -Werror -std=c99 -pedantic -Iinc -O3
 SOURCES=$(wildcard src/*.c)
 OBJS=$(patsubst src/%.c,objs/%.o,$(SOURCES))
 EXECUTABLE=bf
