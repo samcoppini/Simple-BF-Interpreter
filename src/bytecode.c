@@ -75,38 +75,58 @@ void replace_address(struct Bytecode *bytecode, uint32_t index, uint32_t new_add
     bytecode->instructions[index - 1] = (new_address & 0x000000FF) >> 0;
 }
 
+void handle_diff(struct Bytecode *bytecode, uint8_t *cur_diff) {
+    if (*cur_diff == 1) {
+        bytecode_add(bytecode, BF_INC);
+    }
+    else if (*cur_diff == 255) {
+        bytecode_add(bytecode, BF_DEC);
+    }
+    else if (*cur_diff != 0) {
+        bytecode_add(bytecode, BF_ADD);
+        bytecode_add(bytecode, *cur_diff);
+    }
+    *cur_diff = 0;
+}
+
 uint8_t *get_bf_bytecode(FILE *file) {
     struct Bytecode bytecode = create_bytecode();
     struct AddressStack stack = create_address_stack();
+    uint8_t cur_diff = 0;
     int c;
 
     while ((c = fgetc(file)) != EOF) {
         switch (c) {
             case '+':
-                bytecode_add(&bytecode, BF_INC);
+                cur_diff++;
                 break;
 
             case '-':
-                bytecode_add(&bytecode, BF_DEC);
+                cur_diff--;
                 break;
 
             case '<':
+                handle_diff(&bytecode, &cur_diff);
                 bytecode_add(&bytecode, BF_LEFT);
                 break;
 
             case '>':
+                handle_diff(&bytecode, &cur_diff);
                 bytecode_add(&bytecode, BF_RIGHT);
                 break;
 
             case '.':
+                handle_diff(&bytecode, &cur_diff);
                 bytecode_add(&bytecode, BF_OUTPUT);
                 break;
 
             case ',':
                 bytecode_add(&bytecode, BF_INPUT);
+                cur_diff = 0;
                 break;
 
             case '[':
+                handle_diff(&bytecode, &cur_diff);
                 bytecode_add(&bytecode, BF_LOOP_START);
                 add_placeholder_address(&bytecode);
                 stack_add(&stack, bytecode.len);
@@ -117,6 +137,7 @@ uint8_t *get_bf_bytecode(FILE *file) {
                     fprintf(stderr, "Unmatched ]\n");
                     goto err;
                 }
+                handle_diff(&bytecode, &cur_diff);
                 bytecode_add(&bytecode, BF_LOOP_END);
                 add_placeholder_address(&bytecode);
                 uint32_t loop_start = stack_pop(&stack);

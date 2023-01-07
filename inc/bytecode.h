@@ -15,6 +15,7 @@
 enum BfOpCode {
     BF_INC,
     BF_DEC,
+    BF_ADD,
     BF_LEFT,
     BF_RIGHT,
     BF_INPUT,
