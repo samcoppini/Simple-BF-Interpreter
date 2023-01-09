@@ -55,9 +55,19 @@ bool interpret_bf_bytecode(const uint8_t *bytecode) {
                 }
                 break;
 
-            case BF_MOVE:
-                tape_index += (int8_t) *code_ptr++;
+            case BF_MOVE: {
+                int8_t move_amt = (int8_t) *code_ptr++;
+                tape_index += move_amt;
+                if (tape_index < 0) {
+                    fprintf(stderr, "Moved too far left!\n");
+                    return false;
+                }
+                else if (tape_index >= TAPE_LENGTH) {
+                    fprintf(stderr, "Moved too far right!\n");
+                    return false;
+                }
                 break;
+            }
 
             case BF_OUTPUT:
                 putchar(tape[tape_index]);
